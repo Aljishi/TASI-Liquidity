@@ -10,6 +10,8 @@ jobs:
   screenshot:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -32,8 +34,7 @@ jobs:
 
       - name: Run screenshot script
         env:
-          SAHM_USER:        ${{ secrets.SAHM_USER }}
-          SAHM_PASS:        ${{ secrets.SAHM_PASS }}
-          GDRIVE_CREDS:     ${{ secrets.GDRIVE_CREDS }}
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          SAHM_USER: ${{ secrets.SAHM_USER }}
+          SAHM_PASS: ${{ secrets.SAHM_PASS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python screenshot.py
