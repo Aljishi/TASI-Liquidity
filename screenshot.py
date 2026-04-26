@@ -1,35 +1,39 @@
 import os
 import time
 import datetime
+import base64
+import json
+import requests
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-import json
 
 URL_LOGIN = "https://app.sahmcapital.com/login"
 URL_MARKET = "https://app.sahmcapital.com/market"
 USERNAME = os.environ["SAHM_USER"]
 PASSWORD = os.environ["SAHM_PASS"]
-FOLDER_ID = os.environ["GDRIVE_FOLDER_ID"]
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
+REPO = "Aljishi/TASI-Liquidity"
 
-def get_drive_service():
-    creds_json = json.loads(os.environ["GDRIVE_CREDS"])
-    creds = service_account.Credentials.from_service_account_info(
-        creds_json, scopes=SCOPES
-    )
-    return build("drive", "v3", credentials=creds)
-
-def upload_to_drive(service, filepath, filename):
-    meta = {"name": filename, "parents": [FOLDER_ID]}
-    media = MediaFileUpload(filepath, mimetype="image/png")
-    file = service.files().create(body=meta, media_body=media, fields="id").execute()
-    print("Uploaded: " + filename)
+def upload_to_github(filepath, filename):
+    with open(filepath, "rb") as f:
+        content = base64.b64encode(f.read()).decode("utf-8")
+    url = "https://api.github.com/repos/" + REPO + "/contents/screenshots/" + filename
+    headers = {
+        "Authorization": "token " + GITHUB_TOKEN,
+        "Content-Type": "application/json"
+    }
+    data = {
+        "message": "Add screenshot " + filename,
+        "content": content
+    }
+    response = requests.put(url, headers=headers, json=data)
+    if response.status_code in [200, 201]:
+        print("Uploaded to GitHub: " + filename)
+    else:
+        print("Upload failed: " + str(response.status_code) + " " + response.text)
 
 def take_screenshot():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3)))
@@ -56,8 +60,8 @@ def take_screenshot():
         print("Current URL: " + driver.current_url)
 
         if "login" in driver.current_url:
-            print("Login page detected, logging in...")
-            inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='email'], input[type='text'], input[name='email'], input[name='username'], input[name='phone']")
+            print("Logging in...")
+            inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='email'], input[type='text'], input[name='email'], input[name='username']")
             if inputs:
                 inputs[0].clear()
                 inputs[0].send_keys(USERNAME)
@@ -76,14 +80,13 @@ def take_screenshot():
                     }
                 }
             """)
-            print("Login submitted via JS")
+            print("Login submitted")
             time.sleep(10)
 
         print("Navigating to market...")
         driver.get(URL_MARKET)
         time.sleep(8)
 
-        print("Current URL: " + driver.current_url)
         print("Taking screenshot...")
         driver.save_screenshot(filepath)
         print("Screenshot saved: " + filename)
@@ -95,9 +98,8 @@ def take_screenshot():
 
 def main():
     print("Starting TASI Liquidity screenshot...")
-    drive_service = get_drive_service()
     filepath, filename = take_screenshot()
-    upload_to_drive(drive_service, filepath, filename)
+    upload_to_github(filepath, filename)
     print("Done!")
 
 if __name__ == "__main__":
