@@ -11,7 +11,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import json
 
-URL = "https://app.sahmcapital.com/market"
+URL_LOGIN = "https://app.sahmcapital.com/login"
+URL_MARKET = "https://app.sahmcapital.com/market"
 USERNAME = os.environ["SAHM_USER"]
 PASSWORD = os.environ["SAHM_PASS"]
 FOLDER_ID = os.environ["GDRIVE_FOLDER_ID"]
@@ -40,51 +41,55 @@ def take_screenshot():
     opts.add_argument("--headless=new")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
-    opts.add_argument("--window-size=1600,900")
+    opts.add_argument("--window-size=1920,1080")
     opts.add_argument("--disable-blink-features=AutomationControlled")
     opts.add_argument("--lang=ar")
 
     driver = webdriver.Chrome(options=opts)
-    wait = WebDriverWait(driver, 30)
+    wait = WebDriverWait(driver, 40)
 
     try:
         print("Opening login page...")
-        driver.get(URL)
-        time.sleep(4)
+        driver.get(URL_LOGIN)
+        time.sleep(5)
 
-        print("Logging in...")
+        print("Page title: " + driver.title)
+        print("Current URL: " + driver.current_url)
+
+        print("Looking for input fields...")
+        inputs = driver.find_elements(By.TAG_NAME, "input")
+        for i, inp in enumerate(inputs):
+            print("Input " + str(i) + ": type=" + str(inp.get_attribute("type")) + " name=" + str(inp.get_attribute("name")) + " placeholder=" + str(inp.get_attribute("placeholder")))
+
         email_field = wait.until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, "input[type='email'], input[name='email']")
+            (By.CSS_SELECTOR, "input[type='email'], input[type='text'], input[name='email'], input[name='username']")
         ))
         email_field.clear()
         email_field.send_keys(USERNAME)
+        print("Email entered")
 
         pass_field = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
         pass_field.clear()
         pass_field.send_keys(PASSWORD)
+        print("Password entered")
+
+        buttons = driver.find_elements(By.TAG_NAME, "button")
+        for b in buttons:
+            print("Button: " + str(b.text) + " type=" + str(b.get_attribute("type")))
 
         login_btn = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
         login_btn.click()
-        print("Login submitted...")
-        time.sleep(8)
+        print("Login clicked")
+        time.sleep(10)
+
+        print("After login URL: " + driver.current_url)
 
         if "/market" not in driver.current_url:
-            driver.get(URL)
-            time.sleep(5)
+            driver.get(URL_MARKET)
+            time.sleep(6)
 
         print("Taking screenshot...")
-        try:
-            section = driver.find_element(
-                By.XPATH,
-                "//*[contains(text(),'السيولة')]"
-            )
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", section)
-            time.sleep(2)
-            parent = section.find_element(By.XPATH, "ancestor::div[3]")
-            parent.screenshot(filepath)
-        except Exception:
-            print("Section not found, taking full screenshot")
-            driver.save_screenshot(filepath)
+        driver.save_screenshot(filepath)
 
         return filepath, filename
 
