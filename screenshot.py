@@ -51,45 +51,42 @@ def take_screenshot():
     try:
         print("Opening login page...")
         driver.get(URL_LOGIN)
-        time.sleep(5)
+        time.sleep(6)
 
-        print("Page title: " + driver.title)
         print("Current URL: " + driver.current_url)
 
-        print("Looking for input fields...")
-        inputs = driver.find_elements(By.TAG_NAME, "input")
-        for i, inp in enumerate(inputs):
-            print("Input " + str(i) + ": type=" + str(inp.get_attribute("type")) + " name=" + str(inp.get_attribute("name")) + " placeholder=" + str(inp.get_attribute("placeholder")))
+        if "login" in driver.current_url:
+            print("Login page detected, logging in...")
+            inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='email'], input[type='text'], input[name='email'], input[name='username'], input[name='phone']")
+            if inputs:
+                inputs[0].clear()
+                inputs[0].send_keys(USERNAME)
 
-        email_field = wait.until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, "input[type='email'], input[type='text'], input[name='email'], input[name='username']")
-        ))
-        email_field.clear()
-        email_field.send_keys(USERNAME)
-        print("Email entered")
+            pass_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='password']")
+            if pass_inputs:
+                pass_inputs[0].clear()
+                pass_inputs[0].send_keys(PASSWORD)
 
-        pass_field = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
-        pass_field.clear()
-        pass_field.send_keys(PASSWORD)
-        print("Password entered")
+            driver.execute_script("""
+                var buttons = document.querySelectorAll('button');
+                for(var b of buttons) {
+                    if(b.type=='submit' || b.textContent.includes('Login') || b.textContent.includes('Sign') || b.textContent.includes('دخول')) {
+                        b.click();
+                        break;
+                    }
+                }
+            """)
+            print("Login submitted via JS")
+            time.sleep(10)
 
-        buttons = driver.find_elements(By.TAG_NAME, "button")
-        for b in buttons:
-            print("Button: " + str(b.text) + " type=" + str(b.get_attribute("type")))
+        print("Navigating to market...")
+        driver.get(URL_MARKET)
+        time.sleep(8)
 
-        login_btn = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-        login_btn.click()
-        print("Login clicked")
-        time.sleep(10)
-
-        print("After login URL: " + driver.current_url)
-
-        if "/market" not in driver.current_url:
-            driver.get(URL_MARKET)
-            time.sleep(6)
-
+        print("Current URL: " + driver.current_url)
         print("Taking screenshot...")
         driver.save_screenshot(filepath)
+        print("Screenshot saved: " + filename)
 
         return filepath, filename
 
