@@ -1,9 +1,6 @@
 name: TASI Liquidity Screenshot
 
 on:
-  schedule:
-    - cron: '10 7 * * 0,1,2,3,4'
-    - cron: '20 7 * * 0,1,2,3,4'
   workflow_dispatch:
 
 jobs:
