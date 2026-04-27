@@ -11,12 +11,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 URL_LOGIN = "https://app.sahmcapital.com/login"
-URLS = {
-    "market": "https://app.sahmcapital.com/market",
-    "top_gainers": "https://app.sahmcapital.com/market?tab=top_gainers",
-    "most_active": "https://app.sahmcapital.com/market?tab=most_active",
-    "liquidity": "https://app.sahmcapital.com/market?tab=liquidity",
-}
+URL_MARKET = "https://app.sahmcapital.com/market"
 USERNAME = os.environ["SAHM_USER"]
 PASSWORD = os.environ["SAHM_PASS"]
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
@@ -50,32 +45,59 @@ def skip_popups(driver):
         pass
 
 def extract_table(driver):
-    rows = []
     try:
-        table_rows = driver.find_elements(By.CSS_SELECTOR, "table tr")
-        for row in table_rows:
-            cells = [c.text.strip() for c in row.find_elements(By.TAG_NAME, "td")]
-            if any(c for c in cells if c):
-                rows.append(cells)
+        rows = driver.execute_script("""
+            var result = [];
+            var rows = document.querySelectorAll('table tr');
+            rows.forEach(function(row) {
+                var cells = [];
+                row.querySelectorAll('td').forEach(function(td) {
+                    cells.push(td.innerText.trim());
+                });
+                if(cells.some(c => c.length > 0)) result.push(cells);
+            });
+            return result;
+        """)
+        return rows if rows else []
+    except:
+        return []
+
+def click_tab(driver, keywords):
+    try:
+        for kw in keywords:
+            btns = driver.find_elements(By.XPATH,
+                "//*[contains(text(),'" + kw + "')]")
+            for btn in btns:
+                tag = btn.tag_name.lower()
+                if tag in ["button", "a", "span", "div", "li"]:
+                    try:
+                        driver.execute_script("arguments[0].click();", btn)
+                        time.sleep(4)
+                        return True
+                    except:
+                        pass
     except:
         pass
-    if not rows:
-        try:
-            rows = driver.execute_script("""
-                var result = [];
-                var rows = document.querySelectorAll('table tr');
-                rows.forEach(function(row) {
-                    var cells = [];
-                    row.querySelectorAll('td').forEach(function(td) {
-                        cells.push(td.innerText.trim());
-                    });
-                    if(cells.some(c => c.length > 0)) result.push(cells);
-                });
-                return result;
-            """)
-        except:
-            pass
-    return rows
+    return False
+
+def get_market_overview(driver):
+    try:
+        return driver.execute_script("""
+            var data = {};
+            var text = document.body.innerText;
+            var lines = text.split('\\n').map(s => s.trim()).filter(s => s);
+            var keys = ['TASI','NOMUC','Value','Volume','Trades','Up','Down','Unchanged'];
+            for(var i=0; i<lines.length; i++) {
+                for(var k of keys) {
+                    if(lines[i] === k && lines[i+1]) {
+                        data[k] = lines[i+1];
+                    }
+                }
+            }
+            return data;
+        """)
+    except:
+        return {}
 
 def login(driver):
     print("Opening login page...")
@@ -103,25 +125,11 @@ def login(driver):
         print("Login submitted")
         time.sleep(10)
     skip_popups(driver)
-
-def scrape_page(driver, url, label):
-    print("Scraping: " + label)
-    driver.get(url)
-    time.sleep(8)
-    skip_popups(driver)
     time.sleep(2)
-    rows = extract_table(driver)
-    overview_text = driver.execute_script("""
-        var el = document.querySelector('[class*="overview"], [class*="summary"], [class*="market"]');
-        return el ? el.innerText : '';
-    """)
-    return {"label": label, "rows": rows, "overview": overview_text}
 
 def scrape():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3)))
     timestamp = now.strftime("%Y-%m-%d_%H-%M")
-    minute = now.minute
-    snapshot_name = "snapshot_1.json" if minute <= 15 else "snapshot_2.json"
 
     opts = Options()
     opts.add_argument("--headless=new")
@@ -136,51 +144,43 @@ def scrape():
     try:
         login(driver)
 
-        all_data = {"timestamp": timestamp, "snapshot": snapshot_name, "sections": {}}
-
-        driver.get(URLS["market"])
+        print("Loading market page...")
+        driver.get(URL_MARKET)
         time.sleep(8)
         skip_popups(driver)
+        time.sleep(2)
 
-        overview = driver.execute_script("""
-            var texts = [];
-            ['Value','Volume','Trades','Up','Down','Unchanged','TASI','NOMUC'].forEach(function(key) {
-                var els = document.querySelectorAll('*');
-                els.forEach(function(el) {
-                    if(el.children.length === 0 && el.innerText && el.innerText.includes(key)) {
-                        texts.push(el.parentElement ? el.parentElement.innerText.trim() : el.innerText.trim());
-                    }
-                });
-            });
-            return texts.slice(0, 20);
-        """)
-        all_data["market_overview"] = overview
+        all_data = {
+            "timestamp": timestamp,
+            "market_overview": {},
+            "top_gainers": [],
+            "most_active_trades": [],
+            "most_active_value": [],
+            "most_active_volume": [],
+        }
 
-        market_rows = extract_table(driver)
-        all_data["sections"]["top_gainers"] = market_rows[:50]
+        all_data["market_overview"] = get_market_overview(driver)
+        print("Overview: " + str(all_data["market_overview"]))
 
-        tabs = [
-            ("most_active_trades", "الأكثر نشاطاً - صفقات"),
-            ("most_active_value", "الأكثر نشاطاً - قيمة"),
-            ("most_active_volume", "الأكثر نشاطاً - حجم"),
-        ]
+        all_data["top_gainers"] = extract_table(driver)
+        print("Top gainers: " + str(len(all_data["top_gainers"])) + " rows")
 
-        for tab_key, tab_label in tabs:
-            try:
-                tab_btns = driver.find_elements(By.XPATH,
-                    "//*[contains(text(),'Trades') or contains(text(),'Value') or contains(text(),'Volume') or contains(text(),'صفقات') or contains(text(),'قيمة') or contains(text(),'حجم')]")
-                for btn in tab_btns:
-                    if tab_label.split(" - ")[1].lower() in btn.text.lower() or tab_label.split(" - ")[1] in btn.text:
-                        btn.click()
-                        time.sleep(4)
-                        break
-                rows = extract_table(driver)
-                all_data["sections"][tab_key] = rows[:20]
-            except Exception as e:
-                print("Tab error: " + str(e))
+        print("Clicking Trades tab...")
+        click_tab(driver, ["Trades", "صفقات", "Most Active"])
+        all_data["most_active_trades"] = extract_table(driver)
+        print("Trades: " + str(len(all_data["most_active_trades"])) + " rows")
+
+        print("Clicking Value tab...")
+        click_tab(driver, ["Value", "قيمة"])
+        all_data["most_active_value"] = extract_table(driver)
+        print("Value: " + str(len(all_data["most_active_value"])) + " rows")
+
+        print("Clicking Volume tab...")
+        click_tab(driver, ["Volume", "حجم"])
+        all_data["most_active_volume"] = extract_table(driver)
+        print("Volume: " + str(len(all_data["most_active_volume"])) + " rows")
 
         content_str = json.dumps(all_data, ensure_ascii=False, indent=2)
-        upload_to_github(content_str, snapshot_name)
         upload_to_github(content_str, "latest.json")
         print("Done! Timestamp: " + timestamp)
 
