@@ -34,6 +34,6 @@ jobs:
           SAHM_USER: ${{ secrets.SAHM_USER }}
           SAHM_PASS: ${{ secrets.SAHM_PASS }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run:
+        run: |
           python screenshot.py
           python smart_diff.py
