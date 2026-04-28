@@ -1,3 +1,4 @@
+
 name: TASI Liquidity Screenshot
 
 on:
@@ -23,17 +24,16 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Chrome
-        run: |
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update -q
-          sudo apt-get install -y google-chrome-stable
+      # 🔥 الطريقة الصحيحة لتثبيت Chrome + Driver
+      - name: Install Chrome & ChromeDriver
+        uses: browser-actions/setup-chrome@v1
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install selenium webdriver-manager requests
 
-      - name: Run screenshot script
+      - name: Run TASI Engine
         env:
           SAHM_USER: ${{ secrets.SAHM_USER }}
           SAHM_PASS: ${{ secrets.SAHM_PASS }}
