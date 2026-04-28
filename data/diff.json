@@ -1,14 +1,10 @@
 {
-  "type": "TASI_AI_TERMINAL_SMART_DIFF",
-  "generated_at": "2026-04-27_20-05",
-  "source_timestamp": "2026-04-27_19-26",
-  "method": "Opening Scanner PRO",
+  "type": "TASI_AI_TERMINAL_PRO",
+  "generated_at": "2026-04-28_10-20",
+  "status": "waiting_for_3_snapshots",
+  "snapshots_collected": 1,
+  "required_snapshots": 3,
   "best_3": [],
   "top_opportunities": [],
-  "all_results": [],
-  "notes": [
-    "هذه النتائج احتمالية وليست توصية مضمونة.",
-    "يفضل تأكيد الدخول باختراق قمة أول 15 دقيقة أو إعادة اختبار ناجحة.",
-    "تجاهل أي سهم تتحول سيولته إلى سلبية أو يكسر سعر الافتتاح."
-  ]
+  "all_results": []
 }
