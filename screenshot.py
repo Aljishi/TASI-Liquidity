@@ -17,7 +17,7 @@ GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 REPO = "Aljishi/TASI-Liquidity"
 
 
-# ================= GITHUB UPLOAD =================
+# ================= GITHUB =================
 def upload(content, filename):
     encoded = base64.b64encode(content.encode("utf-8")).decode("utf-8")
     url = f"https://api.github.com/repos/{REPO}/contents/data/{filename}"
@@ -44,8 +44,6 @@ def get_driver():
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--window-size=1920,1080")
-    opts.add_argument("--disable-blink-features=AutomationControlled")
-
     return webdriver.Chrome(options=opts)
 
 
@@ -65,91 +63,51 @@ def click_tab(driver, text):
     for el in els:
         try:
             driver.execute_script("arguments[0].click();", el)
-            time.sleep(4)
+            time.sleep(3)
             return True
         except:
             pass
     return False
 
 
-# ================= SNAPSHOT LOGIC =================
-def get_snapshot_filename(now):
-    hour = now.hour
-    minute = now.minute
-
-    # يسمح بتأخير GitHub
-    if hour == 10:
-
-        if 0 <= minute <= 9:
-            return "snapshot_1.json"
-
-        elif 10 <= minute <= 14:
-            return "snapshot_2.json"
-
-        elif 15 <= minute <= 20:
-            return "snapshot_3.json"
-
-    return None
-
-
 # ================= MAIN =================
 def main():
-    now = datetime.datetime.now(
-        datetime.timezone(datetime.timedelta(hours=3))
-    )
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3)))
+    ts = now.strftime("%Y-%m-%d_%H-%M-%S")
 
-    ts = now.strftime("%Y-%m-%d_%H-%M")
-    print("Starting at", ts)
+    print("Starting TEST MODE at", ts)
 
     driver = get_driver()
 
     try:
         # ===== LOGIN =====
-        print("Login...")
         driver.get("https://app.sahmcapital.com/login")
         time.sleep(6)
 
-        if "login" in driver.current_url:
-            inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='email'],input[type='text']")
-            if inputs:
-                inputs[0].send_keys(USERNAME)
+        inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='email'],input[type='text']")
+        if inputs:
+            inputs[0].send_keys(USERNAME)
 
-            pw = driver.find_elements(By.CSS_SELECTOR, "input[type='password']")
-            if pw:
-                pw[0].send_keys(PASSWORD)
+        pw = driver.find_elements(By.CSS_SELECTOR, "input[type='password']")
+        if pw:
+            pw[0].send_keys(PASSWORD)
 
-            btns = driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
-            if btns:
-                btns[0].click()
+        btns = driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
+        if btns:
+            btns[0].click()
 
-            time.sleep(10)
+        time.sleep(10)
 
         # ===== MARKET =====
-        print("Go to market...")
         driver.get("https://app.sahmcapital.com/market")
         time.sleep(8)
 
-        # Skip popups
-        try:
-            skip = driver.find_elements(By.XPATH, "//*[contains(text(),'Skip') or contains(text(),'Next')]")
-            for s in skip:
-                try:
-                    driver.execute_script("arguments[0].click();", s)
-                except:
-                    pass
-        except:
-            pass
-
-        time.sleep(2)
-
         data = {
             "timestamp": ts,
-            "source": "Sahm",
-            "market": "TASI"
+            "mode": "TEST"
         }
 
         # ===== OVERVIEW =====
-        print("Get overview...")
         data["overview"] = driver.execute_script("""
             var d = {};
             var lines = document.body.innerText.split('\\n').map(s=>s.trim()).filter(s=>s);
@@ -162,39 +120,28 @@ def main():
             return d;
         """) or {}
 
-        print("Overview:", data["overview"])
-
         # ===== TABLES =====
-        print("Get gainers...")
-        data["top_gainers"] = get_table(driver)
+        data["gainers"] = get_table(driver)
 
-        print("Get trades...")
         click_tab(driver, "Trades")
-        data["most_active_trades"] = get_table(driver)
+        data["trades"] = get_table(driver)
 
-        print("Get value...")
         click_tab(driver, "Value")
-        data["most_active_value"] = get_table(driver)
+        data["value"] = get_table(driver)
 
-        print("Get volume...")
         click_tab(driver, "Volume")
-        data["most_active_volume"] = get_table(driver)
+        data["volume"] = get_table(driver)
 
-        # ===== SAVE =====
         content = json.dumps(data, ensure_ascii=False, indent=2)
 
-        # always latest
+        # ===== SAVE FILES =====
         upload(content, "latest.json")
 
-        # snapshot
-        snap = get_snapshot_filename(now)
-        if snap:
-            upload(content, snap)
-            print("Saved", snap)
-        else:
-            print("No snapshot now")
+        # كل تشغيل يحفظ snapshot جديد باسم مختلف
+        snapshot_name = f"snapshot_test_{ts}.json"
+        upload(content, snapshot_name)
 
-        print("DONE")
+        print("Saved test snapshot:", snapshot_name)
 
     finally:
         driver.quit()
